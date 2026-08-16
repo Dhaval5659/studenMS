@@ -16,7 +16,7 @@ class userSerializers(serializers.ModelSerializer):
     def create(self, validated_data):
         password = validated_data.pop('password')
         user = User(**validated_data)
-        user.set_password(password)
+        user.set_password(password)      # Hashes the password (PBKDF2) before the saving to the DB
         user.save()
         return user
         

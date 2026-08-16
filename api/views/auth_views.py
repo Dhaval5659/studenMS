@@ -21,13 +21,16 @@ def login_api(request):
     if request.method == 'POST':
         email = request.data.get('email')
         password = request.data.get('password')
+
+        if not email or not password:
+            return Response({'error': 'Email and password both are required'}, status=status.HTTP_400_BAD_REQUEST)
+
         try:
-            user_obj = User.objects.get(email=email, password=password)
+            user_obj = User.objects.get(email=email)   # lookup by email ONLY, no password
         except User.DoesNotExist:
             return Response({'error': 'Invalid email or password'}, status=status.HTTP_401_UNAUTHORIZED)
 
-        user = authenticate(username=user_obj.username, password=password)
-
+        user = authenticate(username=user_obj.username, password=password)   # proper hash check
         if user is None:
             return Response({'error': 'Invalid email or password'}, status=status.HTTP_401_UNAUTHORIZED)
 
@@ -37,5 +40,4 @@ def login_api(request):
             'refresh' : str(refresh),
             'access' : str(refresh.access_token),
             'user' : userSerializers(user).data,
-
-        }, status = status.Http_201_ok)    
+        })    
