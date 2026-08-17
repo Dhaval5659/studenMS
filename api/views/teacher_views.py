@@ -1,45 +1,54 @@
-from rest_framework import status
-from rest_framework.decorators import api_view
-from rest_framework.response import Response
-from ..serializers import teacherSerializer
+from rest_framework import viewsets
+from rest_framework.exceptions import PermissionDenied, ValidationError
+from rest_framework.permissions import IsAuthenticated
+
 from ..models import Teacher
+from ..permissions import IsOwnerOrAdmin, get_role_name
+from ..serializers import teacherSerializer, teacherRegisterSerializer
+from ..utils import StandardResponseMixin
 
-@api_view(['GET', 'POST', 'PUT', 'PATCH', 'DELETE'])
 
-def teacher_api(request, pk = None):
-    if request.method == "GET":
-        id = pk
-        if id is not None:
-            teach = Teacher.objects.get(id = id)
-            serializer = teacherSerializer(teach)
-            return Response([serializer.data])
-        teach = Teacher.objects.all()
-        serializer = teacherSerializer(teach)
-        return Response([serializer.data])
+class TeacherViewSet(StandardResponseMixin, viewsets.ModelViewSet):
+    serializer_class = teacherSerializer
+    permission_classes = [IsAuthenticated, IsOwnerOrAdmin]
 
-    if request.method == "POST":
-        serializer = teacherSerializer(data = request.data)
-        if serializer.is_valid():
+    def get_serializer_class(self):
+        if self.action == 'create':
+            role_name = get_role_name(self.request.user)
+            if role_name == 'Admin':
+                return teacherRegisterSerializer
+            return teacherSerializer
+        return teacherSerializer
+
+    def get_queryset(self):
+        user = self.request.user
+        role_name = get_role_name(user)
+
+        if role_name == 'Admin':
+            return Teacher.objects.all()
+        if role_name == 'Teacher':
+            return Teacher.objects.filter(user=user)
+        return Teacher.objects.none()
+
+    def perform_create(self, serializer):
+        user = self.request.user
+        role_name = get_role_name(user)
+
+        if role_name == 'Admin':
             serializer.save()
-            return Response(serializer.data)
-        return Response(serializer.error)
-    
-    if request.method == "PUT":
-        pk = id
-        teach = Teacher.objects.get(id = pk)
-        serializer = teacherSerializer(teach, data = request.data)
-        if serializer.is_valid():
+        elif role_name == 'Teacher':
+            if Teacher.objects.filter(user=user).exists():
+                raise ValidationError({'user': 'You already have a teacher profile.'})
+            serializer.save(user=user)
+        else:
+            raise PermissionDenied("You don't have permission to create a teacher record.")
+
+    def perform_update(self, serializer):
+        user = self.request.user
+        if get_role_name(user) == 'Admin':
             serializer.save()
-            return Response({'msg' : 'data is updated'})
-        return Response(serializer.error)
+        else:
+            serializer.save(user=user)
 
-    if request.method == "DELETE":
-        pk = id
-        teach = Teacher.objects.get(id=pk)
-        if teach is None:
-            return Response({'msg' : 'Data is Not Found'})
-        teach.delete()
-        return Response({'msg' : 'Delete the Data'})
-
-
-
+    def perform_destroy(self, instance):
+        instance.user.delete()
