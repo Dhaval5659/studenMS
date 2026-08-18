@@ -1,6 +1,6 @@
 # urls.py
 from django.urls import path, include
-from .views.auth_views import CustomTokenRefreshView, login_api, register_api
+from .views.auth_views import CustomTokenRefreshView, login_api, register_api, logout_api
 from rest_framework.routers import DefaultRouter
 from .views.student_views import StudentViewSet
 from .views.teacher_views import TeacherViewSet
@@ -16,6 +16,7 @@ router.register('roles', RoleViewSet, basename='role')
 urlpatterns = [
     path('register/', register_api, name='register'),
     path('login/', login_api, name='login'),
+    path('logout/', logout_api, name = 'logout'),
     path('token/refresh/', CustomTokenRefreshView.as_view(), name='token_refresh'),
     path('', include(router.urls)),
 ]
