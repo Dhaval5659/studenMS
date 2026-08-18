@@ -6,6 +6,7 @@ __pycache__/
 # Django
 *.log
 local_settings.py
+studenMS/settings.py
 db.sqlite3
 db.sqlite3-journal
 media/
@@ -15,6 +16,7 @@ staticfiles/
 .env
 .env.*
 !.env.example
+
 
 # Virtual environments
 .venv/
@@ -34,4 +36,3 @@ Thumbs.db
 .coverage
 htmlcov/
 .pytest_cache/
-
