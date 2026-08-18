@@ -1,5 +1,5 @@
 from rest_framework import status
-from rest_framework.decorators import api_view, permission_classes
+from rest_framework.decorators import api_view, permission_classes, throttle_classes
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework_simplejwt.views import TokenRefreshView
 from ..models import User
@@ -12,6 +12,7 @@ from rest_framework_simplejwt.token_blacklist.models import OutstandingToken, Bl
 from django.core.mail import send_mail
 from django.conf import settings
 from ..models import PasswordResetOTP
+from ..throttles import ForgotPasswordThrottle, ResetPasswordThrottle
 
 
 @api_view(['POST'])
@@ -94,6 +95,7 @@ def logout_api(request):
 
 @api_view(['POST'])
 @permission_classes([AllowAny])
+@throttle_classes([ForgotPasswordThrottle])
 def forgot_password_api(request):
     email = request.data.get('email')
     if not email:
@@ -120,6 +122,7 @@ def forgot_password_api(request):
 
 @api_view(['POST'])
 @permission_classes([AllowAny])
+@throttle_classes([ResetPasswordThrottle])
 def reset_password_api(request):
     email = request.data.get('email')
     otp = request.data.get('otp')
