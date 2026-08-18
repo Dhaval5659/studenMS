@@ -70,7 +70,11 @@ REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES' : ('rest_framework_simplejwt.authentication.JWTAuthentication',),
     'DEFAULT_PERMISSION_CLASSES': ('rest_framework.permissions.IsAuthenticated',),
     'EXCEPTION_HANDLER': 'api.utils.custom_exception_handler',
-}
+    'DEFAULT_THROTTLE_RATES': {
+        'forgot_password' : '3/hour',
+        'reset_password' : '5/hour',
+    },
+}   
 
 SIMPLE_JWT = {
     'ACCESS_TOKEN_LIFETIME' : timedelta(days=1),
@@ -150,3 +154,14 @@ STATIC_URL = 'static/'
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+# settings.py — for local testing (prints emails to terminal, no real email sent)
+EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
+
+# For production later, you'd swap to something like:
+# EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+# EMAIL_HOST = 'smtp.gmail.com'
+# EMAIL_PORT = 587
+# EMAIL_USE_TLS = True
+# EMAIL_HOST_USER = 'your-email@gmail.com'
+# EMAIL_HOST_PASSWORD = 'your-app-password'
