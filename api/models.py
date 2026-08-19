@@ -13,6 +13,11 @@ class Role(models.Model):
 class User(AbstractUser):
     role = models.ForeignKey(Role, on_delete=models.PROTECT, null=True, blank=True)
 
+    def save(self, *args, **kwargs):
+        if self.email:
+            self.email = self.email.lower()
+        super().save(*args, **kwargs)
+
 class Student(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE)
     roll_no = models.IntegerField()

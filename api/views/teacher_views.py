@@ -3,14 +3,14 @@ from rest_framework.exceptions import PermissionDenied, ValidationError
 from rest_framework.permissions import IsAuthenticated
 
 from ..models import Teacher
-from ..permissions import IsOwnerOrAdmin, get_role_name
+from ..permissions import IsTeacherOwnerAdminOrReadOnly, get_role_name
 from ..serializers import teacherSerializer, teacherRegisterSerializer
 from ..utils import StandardResponseMixin
 
 
 class TeacherViewSet(StandardResponseMixin, viewsets.ModelViewSet):
     serializer_class = teacherSerializer
-    permission_classes = [IsAuthenticated, IsOwnerOrAdmin]
+    permission_classes = [IsAuthenticated, IsTeacherOwnerAdminOrReadOnly]
 
     def get_serializer_class(self):
         if self.action == 'create':
@@ -27,7 +27,7 @@ class TeacherViewSet(StandardResponseMixin, viewsets.ModelViewSet):
         if role_name == 'Admin':
             return Teacher.objects.all()
         if role_name == 'Teacher':
-            return Teacher.objects.filter(user=user)
+            return Teacher.objects.all()
         return Teacher.objects.none()
 
     def perform_create(self, serializer):

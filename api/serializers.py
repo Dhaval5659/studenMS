@@ -17,6 +17,15 @@ class userSerializers(serializers.ModelSerializer):
         model = User
         fields = ['id', 'username', 'email', 'password', 'role', 'role_name']
 
+    def validate_email(self, value):
+        email = value.lower()
+        queryset = User.objects.filter(email=email)
+        if self.instance:
+            queryset = queryset.exclude(pk=self.instance.pk)
+        if queryset.exists():
+            raise serializers.ValidationError('This email is already registered.')
+        return email
+
     def create(self, validated_data):
         password = validated_data.pop('password')
         user = User(**validated_data)
@@ -58,6 +67,10 @@ class registerSerializer(userSerializers):
                 raise serializers.ValidationError({'roll_no': 'This field is required for student registration.'})
             if attrs.get('std') is None:
                 raise serializers.ValidationError({'std': 'This field is required for student registration.'})
+            if Student.objects.filter(roll_no=roll_no, std=attrs.get('std')).exists():
+                raise serializers.ValidationError({
+                    'roll_no': 'This roll number is already registered for this standard.'
+                })
 
         if role_name == 'Teacher' and not attrs.get('subject'):
             raise serializers.ValidationError({'subject': 'This field is required for teacher registration.'})
@@ -102,16 +115,35 @@ class registerSerializer(userSerializers):
 
 
 class studentSerializer(serializers.ModelSerializer):
+    username = serializers.CharField(source='user.username', read_only=True)
+    email = serializers.EmailField(source='user.email', read_only=True)
+
     class Meta:
         model = Student
-        fields = '__all__'
+        fields = ['id', 'user', 'username', 'email', 'roll_no', 'std']
         extra_kwargs = {'user': {'required': False}}
+
+    def validate(self, attrs):
+        roll_no = attrs.get('roll_no', getattr(self.instance, 'roll_no', None))
+        std = attrs.get('std', getattr(self.instance, 'std', None))
+
+        queryset = Student.objects.filter(roll_no=roll_no, std=std)
+        if self.instance:
+            queryset = queryset.exclude(pk=self.instance.pk)
+        if queryset.exists():
+            raise serializers.ValidationError({
+                'roll_no': 'This roll number is already registered for this standard.'
+            })
+        return attrs
 
 
 class teacherSerializer(serializers.ModelSerializer):
+    username = serializers.CharField(source='user.username', read_only=True)
+    email = serializers.EmailField(source='user.email', read_only=True)
+
     class Meta:
         model = Teacher
-        fields = '__all__'
+        fields = ['id', 'user', 'username', 'email', 'subject']
         extra_kwargs = {'user': {'required': False}}
 
 
@@ -123,6 +155,19 @@ class studentRegisterSerializer(serializers.ModelSerializer):
     class Meta:
         model = Student
         fields = ['id', 'username', 'email', 'password', 'roll_no', 'std']
+
+    def validate_email(self, value):
+        email = value.lower()
+        if User.objects.filter(email=email).exists():
+            raise serializers.ValidationError('This email is already registered.')
+        return email
+
+    def validate(self, attrs):
+        if Student.objects.filter(roll_no=attrs.get('roll_no'), std=attrs.get('std')).exists():
+            raise serializers.ValidationError({
+                'roll_no': 'This roll number is already registered for this standard.'
+            })
+        return attrs
 
     def create(self, validated_data):
         username = validated_data.pop('username')
@@ -159,6 +204,9 @@ class teacherRegisterSerializer(serializers.ModelSerializer):
     class Meta:
         model = Teacher
         fields = ['id', 'username', 'email', 'password', 'subject']
+
+    def validate_email(self, value):
+        return value.lower()
 
     def create(self, validated_data):
         username = validated_data.pop('username')

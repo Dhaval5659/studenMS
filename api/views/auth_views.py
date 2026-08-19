@@ -112,8 +112,8 @@ def forgot_password_api(request):
 
     send_mail(
         subject='Your Password Reset OTP',
-        message='Your OTP for password reset is: {otp}. It expires in 10 minutes.',
-        from_email='noreply@studenms.com',
+        message=f'Your OTP for password reset is: {otp}. It expires in 10 minutes.',
+        from_email=settings.DEFAULT_FROM_EMAIL,
         recipient_list=[email],
         fail_silently=False,
     )    
@@ -145,5 +145,6 @@ def reset_password_api(request):
     otp_obj.save()
 
     return success_response(message="Password reset successful")
+
 
 

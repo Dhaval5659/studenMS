@@ -43,6 +43,20 @@ class IsOwnerOrAdmin(BasePermission):
         return obj.user_id == request.user.id
 
 
+class IsTeacherOwnerAdminOrReadOnly(BasePermission):
+    def has_permission(self, request, view):
+        role_name = get_role_name(request.user)
+        return role_name in ['Admin', 'Teacher']
+
+    def has_object_permission(self, request, view, obj):
+        role_name = get_role_name(request.user)
+        if role_name == 'Admin':
+            return True
+        if role_name == 'Teacher' and request.method in SAFE_METHODS:
+            return True
+        return obj.user_id == request.user.id
+
+
 class IsStudentOwnerAdminOrTeacherReadOnly(BasePermission):
     def has_permission(self, request, view):
         role_name = get_role_name(request.user)
