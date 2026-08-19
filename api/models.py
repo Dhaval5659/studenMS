@@ -26,6 +26,7 @@ class Student(models.Model):
 class Teacher(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE)
     subject = models.CharField(max_length=25)
+    class_teacher_of = models.IntegerField(null=True, blank=True, unique=True)
 
 class PasswordResetOTP(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE)

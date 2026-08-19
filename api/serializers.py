@@ -20,7 +20,7 @@ class userSerializers(serializers.ModelSerializer):
     def validate_email(self, value):
         email = value.lower()
         queryset = User.objects.filter(email=email)
-        if self.instance:
+        if self.instance:                           # For Update use when it comes to duplicate
             queryset = queryset.exclude(pk=self.instance.pk)
         if queryset.exists():
             raise serializers.ValidationError('This email is already registered.')
@@ -29,7 +29,7 @@ class userSerializers(serializers.ModelSerializer):
     def create(self, validated_data):
         password = validated_data.pop('password')
         user = User(**validated_data)
-        user.set_password(password)
+        user.set_password(password)             # Hash the Password
         user.save()
         return user
 
@@ -45,12 +45,12 @@ class userSerializers(serializers.ModelSerializer):
 
 class registerSerializer(userSerializers):
     roll_no = serializers.IntegerField(write_only=True, required=False)
-    roll_number = serializers.IntegerField(write_only=True, required=False)
     std = serializers.IntegerField(write_only=True, required=False)
     subject = serializers.CharField(write_only=True, required=False, max_length=25)
+    class_teacher_of = serializers.IntegerField(write_only=True, required=False, allow_null=True)
 
     class Meta(userSerializers.Meta):
-        fields = userSerializers.Meta.fields + ['roll_no', 'roll_number', 'std', 'subject']
+        fields = userSerializers.Meta.fields + ['roll_no', 'std', 'subject', 'class_teacher_of']
 
     def validate_role(self, value):
         if value and value.role_name == 'Admin':
@@ -62,7 +62,7 @@ class registerSerializer(userSerializers):
         role_name = getattr(role, 'role_name', None)
 
         if role_name == 'Student':
-            roll_no = attrs.get('roll_no', attrs.get('roll_number'))
+            roll_no = attrs.get('roll_no')
             if roll_no is None:
                 raise serializers.ValidationError({'roll_no': 'This field is required for student registration.'})
             if attrs.get('std') is None:
@@ -72,25 +72,32 @@ class registerSerializer(userSerializers):
                     'roll_no': 'This roll number is already registered for this standard.'
                 })
 
-        if role_name == 'Teacher' and not attrs.get('subject'):
-            raise serializers.ValidationError({'subject': 'This field is required for teacher registration.'})
+        if role_name == 'Teacher':
+            if not attrs.get('subject'):
+                raise serializers.ValidationError({'subject': 'This field is required for teacher registration.'})
+
+            class_teacher_of = attrs.get('class_teacher_of')
+            if class_teacher_of is not None and Teacher.objects.filter(class_teacher_of=class_teacher_of).exists():
+                raise serializers.ValidationError({
+                    'class_teacher_of': f'A class teacher is already assigned for standard {class_teacher_of}.'
+                })
 
         return attrs
 
     @transaction.atomic
     def create(self, validated_data):
         roll_no = validated_data.pop('roll_no', None)
-        roll_number = validated_data.pop('roll_number', None)
         std = validated_data.pop('std', None)
         subject = validated_data.pop('subject', None)
+        class_teacher_of = validated_data.pop('class_teacher_of', None)
 
         user = super().create(validated_data)
         role_name = getattr(user.role, 'role_name', None)
 
         if role_name == 'Student':
-            Student.objects.create(user=user, roll_no=roll_no or roll_number, std=std)
+            Student.objects.create(user=user, roll_no=roll_no, std=std)
         elif role_name == 'Teacher':
-            Teacher.objects.create(user=user, subject=subject)
+            Teacher.objects.create(user=user, subject=subject, class_teacher_of=class_teacher_of)
 
         return user
 
@@ -109,6 +116,7 @@ class registerSerializer(userSerializers):
             data['teacher'] = {
                 'id': instance.teacher.id,
                 'subject': instance.teacher.subject,
+                'class_teacher_of': instance.teacher.class_teacher_of,
             }
 
         return data
@@ -117,10 +125,11 @@ class registerSerializer(userSerializers):
 class studentSerializer(serializers.ModelSerializer):
     username = serializers.CharField(source='user.username', read_only=True)
     email = serializers.EmailField(source='user.email', read_only=True)
+    class_teacher = serializers.SerializerMethodField()
 
     class Meta:
         model = Student
-        fields = ['id', 'user', 'username', 'email', 'roll_no', 'std']
+        fields = ['id', 'user', 'username', 'email', 'roll_no', 'std', 'class_teacher']
         extra_kwargs = {'user': {'required': False}}
 
     def validate(self, attrs):
@@ -136,15 +145,52 @@ class studentSerializer(serializers.ModelSerializer):
             })
         return attrs
 
+    def get_class_teacher(self, obj):
+        teacher = Teacher.objects.filter(class_teacher_of=obj.std).select_related('user').first()
+        if teacher:
+            return {
+                'id': teacher.id,
+                'username': teacher.user.username,
+                'email': teacher.user.email,
+                'subject': teacher.subject,
+            }
+        return None
+
 
 class teacherSerializer(serializers.ModelSerializer):
     username = serializers.CharField(source='user.username', read_only=True)
     email = serializers.EmailField(source='user.email', read_only=True)
+    class_students = serializers.SerializerMethodField()
 
     class Meta:
         model = Teacher
-        fields = ['id', 'user', 'username', 'email', 'subject']
+        fields = ['id', 'user', 'username', 'email', 'subject', 'class_teacher_of', 'class_students']
         extra_kwargs = {'user': {'required': False}}
+
+    def validate(self, attrs):
+        class_teacher_of = attrs.get('class_teacher_of', getattr(self.instance, 'class_teacher_of', None))
+        if class_teacher_of is not None:
+            queryset = Teacher.objects.filter(class_teacher_of=class_teacher_of)
+            if self.instance:
+                queryset = queryset.exclude(pk=self.instance.pk)
+            if queryset.exists():
+                raise serializers.ValidationError({
+                    'class_teacher_of': f'A class teacher is already assigned for standard {class_teacher_of}.'
+                })
+        return attrs
+
+    def get_class_students(self, obj):
+        if obj.class_teacher_of is None:
+            return None
+        students = Student.objects.filter(std=obj.class_teacher_of).select_related('user')
+        return [
+            {
+                'id': student.id,
+                'username': student.user.username,
+                'roll_no': student.roll_no,
+            }
+            for student in students
+        ]
 
 
 class studentRegisterSerializer(serializers.ModelSerializer):
@@ -203,10 +249,20 @@ class teacherRegisterSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Teacher
-        fields = ['id', 'username', 'email', 'password', 'subject']
+        fields = ['id', 'username', 'email', 'password', 'subject', 'class_teacher_of']
 
     def validate_email(self, value):
-        return value.lower()
+        email = value.lower()
+        if User.objects.filter(email=email).exists():
+            raise serializers.ValidationError('This email is already registered.')
+        return email
+
+    def validate_class_teacher_of(self, value):
+        if value is not None and Teacher.objects.filter(class_teacher_of=value).exists():
+            raise serializers.ValidationError(
+                f'A class teacher is already assigned for standard {value}.'
+            )
+        return value
 
     def create(self, validated_data):
         username = validated_data.pop('username')
@@ -228,4 +284,5 @@ class teacherRegisterSerializer(serializers.ModelSerializer):
             'username': instance.user.username,
             'email': instance.user.email,
             'subject': instance.subject,
+            'class_teacher_of': instance.class_teacher_of,
         }
