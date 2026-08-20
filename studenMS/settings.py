@@ -68,12 +68,12 @@ MIDDLEWARE = [
 
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES' : ('rest_framework_simplejwt.authentication.JWTAuthentication',),
-    'DEFAULT_PERMISSION_CLASSES': ('rest_framework.permissions.IsAuthenticated',),
-    'EXCEPTION_HANDLER': 'api.utils.custom_exception_handler',
-    'DEFAULT_THROTTLE_RATES': {
+    'DEFAULT_PERMISSION_CLASSES' : ('rest_framework.permissions.IsAuthenticated',),
+    'EXCEPTION_HANDLER' : 'api.utils.custom_exception_handler',
+    'DEFAULT_THROTTLE_RATES' : {
         'forgot_password' : '3/hour',
         'reset_password' : '5/hour',
-    },
+    }
 }   
 
 SIMPLE_JWT = {
